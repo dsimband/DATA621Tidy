@@ -1,0 +1,214 @@
+
+
+
+
+
+```{r}
+
+library(tidyverse)
+library(tidymodels)
+library(workflowsets)
+library(dotwhisker)
+library(summarytools)
+library(kknn)
+
+
+```
+
+
+
+
+```{r}
+
+
+df <- read.csv('./inst/data/Teams.csv')
+df <- sample_n(df, size=400)
+statistics <- c('R', 'H', 'X2B', 'X3B', 'HR', 
+                    'RA', 'ER', 'HA', 'HRA')
+
+
+
+# Preprocess Data
+df <- df %>% select('yearID', 'lgID', 'teamID', 'franchID', 'name', 'divID', 'G', 'W', 'L', 
+                    'R', 'H', 'X2B', 'X3B', 'HR', 
+                    'RA', 'ER', 'HA', 'HRA')
+
+df$wPer <- round(df$W / df$G, 3)
+df$pythPer <- (df$R^2) / ((df$R^2) + (df$RA^2))
+
+
+df <- df %>% mutate(era_cat = case_when(yearID >= 1969 ~ '1969+',
+                                                yearID >= 1900 & yearID < 1969 ~ '1900-1969',
+                                                yearID < 1900 ~ '1900-'))
+
+df$era_cat <- factor(df$era_cat)
+
+
+
+# Split Data
+data_split <- initial_split(df, prop = 0.8, strata = era_cat)
+train_data <- training(data_split)
+test_data  <- testing(data_split)
+
+
+
+```
+
+
+
+
+```{r}
+
+
+#data(Chicago)
+# Use a small sample to keep file sizes down:
+#Chicago <- Chicago %>% slice(1:365)
+
+base_recipe <- 
+   recipe(W ~ pythPer + era_cat + yearID + teamID + franchID + 
+            R + H + X2B + X3B + HR + RA + ER + HA + HRA, data = train_data) %>% 
+   update_role(yearID, teamID, franchID, new_role = "ID") %>%
+   step_dummy(all_nominal_predictors()) %>% 
+   step_zv(all_predictors()) %>% 
+   step_normalize(all_predictors())
+
+
+```
+
+
+
+
+```{r}
+
+
+filter_rec <- 
+   base_recipe %>% 
+   step_corr(all_of(statistics), threshold = tune())
+
+
+pca_rec <- 
+   base_recipe %>% 
+   step_pca(all_of(statistics), num_comp = tune()) %>% 
+   step_normalize(all_predictors())
+
+
+```
+
+
+
+
+
+```{r}
+
+regularized_spec <- 
+   linear_reg(penalty = tune(), mixture = tune()) %>% 
+   set_engine("glmnet")
+
+cart_spec <- 
+   decision_tree(cost_complexity = tune(), min_n = tune()) %>% 
+   set_engine("rpart") %>% 
+   set_mode("regression")
+
+knn_spec <- 
+   nearest_neighbor(neighbors = tune(), weight_func = tune()) %>% 
+   set_engine("kknn") %>% 
+   set_mode("regression")
+
+```
+
+
+
+```{r}
+
+chi_models <- 
+   workflow_set(
+      preproc = list(simple = base_recipe, filter = filter_rec, 
+                     pca = pca_rec),
+      models = list(glmnet = regularized_spec, cart = cart_spec, 
+                    knn = knn_spec),
+      cross = TRUE
+   )
+chi_models
+
+```
+
+
+
+
+```{r}
+chi_models <- 
+   chi_models %>% 
+   anti_join(tibble(wflow_id = c("pca_glmnet", "filter_glmnet")), 
+             by = "wflow_id")
+```
+
+
+
+
+
+```{r}
+
+splits <- 
+   vfold_cv(
+      train_data,
+      v = 10,
+      strata = era_cat
+   )
+splits
+
+```
+
+
+
+
+```{r}
+
+set.seed(123)
+chi_models <- 
+   chi_models %>% 
+   # The first argument is a function name from the {{tune}} package
+   # such as `tune_grid()`, `fit_resamples()`, etc.
+   workflow_map("tune_grid", resamples = splits, grid = 10, 
+                metrics = metric_set(mae), verbose = TRUE)
+
+chi_models
+
+
+```
+
+
+
+
+```{r}
+
+autoplot(chi_models)
+
+```
+
+
+
+```{r}
+
+autoplot(chi_models, select_best = TRUE)
+
+```
+
+
+
+
+```{r}
+
+rank_results(chi_models, rank_metric = "mae", select_best = TRUE) %>% 
+   select(rank, mean, model, wflow_id, .config)
+
+```
+
+
+
+
+
+
+
+
+
+

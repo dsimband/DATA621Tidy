@@ -1,0 +1,494 @@
+---
+title: 'Blog 1: Tidy Models'
+author: David Simbandumwe
+subtitle: Value of Opinionated Workflows
+output:
+  word_document:
+    toc: yes
+  html_document:
+    toc: yes
+    toc_float: yes
+    theme: united
+  pdf_document:
+    toc: yes
+editor_options:
+  chunk_output_type: console
+  markdown:
+    wrap: sentence
+bibliography: references.bib
+---
+
+
+
+
+
+```{r}
+
+library(tidyverse)
+library(tidymodels)
+library(workflowsets)
+library(dotwhisker)
+library(summarytools)
+
+```
+
+
+```{r}
+
+#rm(list=ls())
+
+cfg <- list(
+              fileName = './inst/data/Teams.csv',
+              rSource = './hw1/Functions.R',
+              viewMethod = 'view' # options(render, browser, view)
+          )
+
+
+```
+
+
+
+
+```{r}
+
+
+knitr::opts_chunk$set(echo = F, 
+                      warning = F, 
+                      message = F, 
+                      eval = T , 
+                      results="asis", 
+                      fig.height=6, 
+                      fig.width=8)
+
+set.seed(1234)
+
+
+# styling
+st_css()
+
+ st_options(
+   plain.ascii = FALSE,
+   style = 'grid',
+   dfSummary.style ='grid',
+   freq.silent  = TRUE,
+   headings     = FALSE,
+   tmp.img.dir  = "./tmp",
+   dfSummary.custom.1 =
+     expression(
+       paste(
+         "Q1 - Q3 :",
+         round(
+           quantile(column_data, probs = .25, type = 2,
+                    names = FALSE, na.rm = TRUE), digits = 1
+         ), " - ",
+         round(
+           quantile(column_data, probs = .75, type = 2,
+                    names = FALSE, na.rm = TRUE), digits = 1
+         )
+       )
+     )
+ )
+
+#source('', local = knitr::knit_global())
+
+```
+
+
+# Overview
+
+
+
+
+# Data Exploration
+
+2.8  Teams table
+
+yearID         Year
+lgID           League
+teamID         Team
+franchID       Franchise (links to TeamsFranchise table)
+divID          Team's division
+Rank           Position in final standings
+G              Games played
+GHome          Games played at home
+W              Wins
+L              Losses
+DivWin         Division Winner (Y or N)
+WCWin          Wild Card Winner (Y or N)
+LgWin          League Champion(Y or N)
+WSWin          World Series Winner (Y or N)
+R              Runs scored
+AB             At bats
+H              Hits by batters
+2B             Doubles
+3B             Triples
+HR             Homeruns by batters
+BB             Walks by batters
+SO             Strikeouts by batters
+SB             Stolen bases
+CS             Caught stealing
+HBP            Batters hit by pitch
+SF             Sacrifice flies
+RA             Opponents runs scored
+ER             Earned runs allowed
+ERA            Earned run average
+CG             Complete games
+SHO            Shutouts
+SV             Saves
+IPOuts         Outs Pitched (innings pitched x 3)
+HA             Hits allowed
+HRA            Homeruns allowed
+BBA            Walks allowed
+SOA            Strikeouts by pitchers
+E              Errors
+DP             Double Plays
+FP             Fielding  percentage
+name           Team's full name
+park           Name of team's home ballpark
+attendance     Home attendance total
+BPF            Three-year park factor for batters
+PPF            Three-year park factor for pitchers
+teamIDBR       Team ID used by Baseball Reference website
+teamIDlahman45 Team ID used in Lahman database version 4.5
+teamIDretro    Team ID used by Retrosheet
+
+
+
+
+```{r}
+
+df <- read.csv(cfg$fileName)
+
+
+# Preprocess Data
+df <- df %>% select('yearID', 'lgID', 'teamID', 'franchID', 'name', 'divID', 'G', 'W', 'L', 
+                    'R', 'H', 'X2B', 'X3B', 'HR', 
+                    'RA', 'ER', 'HA', 'HRA')
+
+df$wPer <- round(df$W / df$G, 3)
+df$pythPer <- (df$R^2) / ((df$R^2) + (df$RA^2))
+
+
+df <- df %>% mutate(era_cat = case_when(yearID >= 1969 ~ '1969+',
+                                                yearID >= 1900 & yearID < 1969 ~ '1900-1969',
+                                                yearID < 1900 ~ '1900-'))
+
+df$era_cat <- factor(df$era_cat)
+
+
+
+# Split Data
+data_split <- initial_split(df, prop = 0.8, strata = era_cat)
+train_data <- training(data_split)
+test_data  <- testing(data_split)
+
+
+
+
+
+```
+
+
+
+
+
+```{r}
+
+print(
+  dfSummary(train_data %>% select(-c('teamID','franchID','name')), 
+            varnumbers   = TRUE,
+            na.col       = TRUE,
+            graph.magnif = .8,
+            tmp.img.dir  = "/tmp"),
+  method = cfg$viewMethod
+)
+
+
+```
+
+
+
+
+```{r}
+
+
+
+```
+
+
+
+
+
+```{r}
+
+
+ggplot(sample_n(train_data, size=300, weight_by = era_cat),
+       aes(x = wPer, 
+           y = pythPer, 
+           group = era_cat, 
+           col = era_cat)) + 
+  geom_point() + 
+  geom_smooth(method = lm, se = FALSE) +
+  scale_color_viridis_d(option = "plasma", end = .7)
+
+```
+
+
+# Data Preparation
+
+```{r}
+
+
+
+```
+
+
+
+```{r}
+
+
+
+```
+
+
+
+# Build Models 
+
+
+```{r}
+
+wins_rec <- 
+  recipe(W ~ pythPer + era_cat + yearID + teamID + franchID , data = train_data)  %>%
+  update_role(yearID, teamID, franchID, new_role = "ID") %>%
+  step_dummy(all_nominal_predictors())
+
+
+summary(wins_rec)
+
+
+```
+
+
+
+```{r}
+
+
+win_lm_mod <- linear_reg() 
+
+
+wins_wflow <- workflow() %>%
+                  add_model(win_lm_mod) %>%
+                  add_recipe(wins_rec)
+
+
+```
+
+
+
+
+
+
+
+```{r}
+
+wins_fit <- 
+  wins_wflow %>% 
+  fit(data = train_data)
+
+
+wins_fit %>% 
+  extract_fit_parsnip() %>% 
+  tidy()
+
+```
+
+
+
+
+
+
+# Predict
+
+```{r}
+
+predict(wins_fit, test_data)
+
+```
+
+
+
+
+
+
+
+
+# Model Set
+
+```{r}
+library(workflowsets)
+```
+
+
+```{r}
+
+
+wins_list <- list(
+  py = W ~ pythPer,
+  hits = W ~ H,
+  era = W ~ pythPer + era_cat
+)
+
+win_lm_mod <- linear_reg() 
+
+win_models <- workflow_set(preproc = wins_list, models = list(lm = win_lm_mod))
+win_models
+
+
+win_models <-
+   win_models %>%
+   mutate(fit = map(info, ~ fit(.x$workflow[[1]], train_data)))
+win_models
+
+
+
+
+```
+
+
+
+
+```{r}
+
+win_models <-
+   win_models %>%
+   mutate(predict = map(fit, ~ predict(.x$workflow[[1]], test_data)))
+win_models
+
+```
+
+
+
+
+```{r}
+
+final_lm_res <- last_fit(lm_wflow, ames_split)
+final_lm_res
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+
+lm_mod <- linear_reg() 
+
+lm_fit <- 
+  lm_mod %>% 
+  fit(W ~ pythPer + era_cat, data = df)
+
+
+```
+
+
+```{r}
+
+tidy(lm_fit) %>% 
+  dwplot(dot_args = list(size = 2, color = "black"),
+         whisker_args = list(color = "black"),
+         vline = geom_vline(xintercept = 0, colour = "grey50", linetype = 2))
+
+```
+
+
+## Predict New Values
+
+```{r}
+
+new_points <- expand.grid(pythPer = .5, 
+                          era_cat = c("1900-", "1900-1969", "1969+"))
+new_points
+
+
+
+mean_pred <- predict(lm_fit, new_data = new_points)
+mean_pred
+
+```
+
+
+
+
+
+```{r}
+conf_int_pred <- predict(lm_fit, 
+                         new_data = new_points, 
+                         type = "conf_int")
+conf_int_pred
+
+# bind new columns
+plot_data <- 
+  new_points %>% 
+  bind_cols(mean_pred) %>% 
+  bind_cols(conf_int_pred)
+
+
+
+# and plot:
+ggplot(plot_data, aes(x = era_cat)) + 
+  geom_point(aes(y = .pred)) + 
+  geom_errorbar(aes(ymin = .pred_lower, 
+                    ymax = .pred_upper),
+                width = .2) + 
+  labs(y = "wins")
+
+
+```
+
+
+
+
+
+```{r}
+
+
+
+```
+
+
+# Model Selection
+
+
+
+
+# Conclusion
+
+
+
+
+
+
+
+
+
