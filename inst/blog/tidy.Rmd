@@ -12,11 +12,71 @@ output:
   pdf_document:
     toc: yes
 editor_options:
-  chunk_output_type: console
+  chunk_output_type: inline
   markdown:
     wrap: sentence
 bibliography: references.bib
 ---
+
+
+# Overview
+
+The first assigment in DATA621 was based on the MoneyBall approach to baseball. The goal of the assignment was to use team statistics to predict the number of wins for a team. The goals were to deal with messy incomplete data and use the techniques learned in class to clean up the data, build a set of predictive models and select the most suitable model. This was an interesting topic for engagement, however even with our best efforts it was difficult to build a 
+
+
+I tried to have ChatGPT answer the questions
+`There are several ways to improve the accuracy of data science models:
+
+Feature engineering: This involves selecting and transforming the input variables (features) used in the model. This can include adding new features, removing irrelevant features, scaling or normalizing features, and transforming features into more useful representations.
+Model selection: Choosing the right algorithm for the problem is important. Different algorithms have different strengths and weaknesses, and some may perform better than others on certain types of data.
+Hyperparameter tuning: Many machine learning algorithms have hyperparameters that need to be set before training the model. Optimizing these hyperparameters can improve the model's accuracy.
+Ensembling: Combining multiple models can often lead to improved accuracy. This can include techniques like bagging, boosting, or stacking.
+Data augmentation: Increasing the size of the training dataset can help the model learn more about the underlying patterns in the data.
+Regularization: Techniques like L1 or L2 regularization can help prevent overfitting and improve the model's ability to generalize to new data.
+Model interpretation: Understanding how the model is making its predictions can lead to insights about how to improve the accuracy. Techniques like feature importance analysis and partial dependence plots can help with this.
+Cleaning and preprocessing data: This involves identifying and correcting errors or inconsistencies in the data, as well as handling missing values or outliers. Proper data cleaning and preprocessing can improve the accuracy of the model.
+Transfer learning: This involves using pre-trained models to improve the performance of your own model. This can be particularly useful when working with limited data.
+Overall, improving the accuracy of a data science model often involves a combination of these techniques, as well as careful experimentation and analysis.`
+
+
+
+A better set of answer can be pulled from the following blog:
+
+https://www.analyticsvidhya.com/blog/2015/12/improve-machine-learning-results/
+
+Eight Methods to Boost the Accuracy of a Model
+1. Add more data
+2. Treat missing and Outlier values
+3. Feature Engineering
+4. Feature Selection
+5. Multiple algorithms
+6. Algorithm Tuning
+7. Ensemble methods
+8. Cross Validation: 
+
+
+
+These methods can be broken down by 
+
+ - A) Improve Inputs Data - 
+1. Add more data
+2. Treat missing and Outlier values
+ 
+ 
+ - B) Engage with SME - Saber Metrics - 
+3. Feature Engineering
+ 
+ 
+ - 3) Opinionated Modeling Frameworks - 
+4. Feature Selection
+5. Multiple algorithms
+6. Algorithm Tuning
+7. Ensemble methods
+8. Cross Validation: 
+ 
+ 
+These are captured in order of importance. Regardless of the approach cleanet data will have a bigger impact on the model. Wisdom of experts and SMEs and finally using frameworks to test. 
+
 
 
 
@@ -31,6 +91,56 @@ library(dotwhisker)
 library(summarytools)
 
 ```
+
+
+# A) Improve Inputs Data - 
+
+## Data Exploration
+
+Despite significant efforts to compensate for poor data quality, the resulting models are poor predictors of win totals.
+
+Moreover, the poor data quality is inconsistent with the overall state of baseball statistics.
+When it comes to the major sports, baseball has the most mature statistics available.
+Therefore finding better data is the best course of action for developing a better predictive model.
+
+We were able to locate a cleaner version of the same data set provided in the class.
+The Lahman's Baseball Database includes the same variables as the sample database with fewer errors and additional reference data that would allow us to connect the database to other sources.
+
+
+<https://www.seanlahman.com/baseball-archive/statistics/>
+
+
+1.1 Introduction
+
+This database contains pitching, hitting, and fielding statistics for
+Major League Baseball from 1871 through 2021.  It includes data from
+the two current leagues (American and National), the four other "major" 
+leagues (American Association, Union Association, Players League, and
+Federal League), and the National Association of 1871-1875. 
+
+This database was created by Sean Lahman, who pioneered the effort to
+make baseball statistics freely available to the general public. What
+started as a one man effort in 1994 has grown tremendously, and now a
+team of researchers have collected their efforts to make this the
+largest and most accurate source for baseball statistics available
+anywhere. (See Acknowledgements below for a list of the key
+contributors to this project.)
+
+None of what we have done would have been possible without the
+pioneering work of Hy Turkin, S.C. Thompson, David Neft, and Pete
+Palmer (among others).  All baseball fans owe a debt of gratitude
+to the people who have worked so hard to build the tremendous set
+of data that we have today.  Our thanks also to the many members of
+the Society for American Baseball Research who have helped us over
+the years.  We strongly urge you to support and join their efforts.
+Please vist their website (www.sabr.org).
+
+If you have any problems or find any errors, please let us know.  Any 
+feedback is appreciated
+
+
+
+
 
 
 ```{r}
@@ -94,12 +204,16 @@ st_css()
 ```
 
 
-# Overview
 
 
 
 
-# Data Exploration
+
+
+
+
+
+
 
 2.8  Teams table
 
@@ -155,9 +269,14 @@ teamIDretro    Team ID used by Retrosheet
 
 
 
+
 ```{r}
 
-df <- read.csv(cfg$fileName)
+df <- read.csv('./inst/data/Teams.csv')
+df <- sample_n(df, size=400)
+statistics <- c('R', 'H', 'X2B', 'X3B', 'HR', 
+                    'RA', 'ER', 'HA', 'HRA')
+
 
 
 # Preprocess Data
@@ -183,13 +302,17 @@ train_data <- training(data_split)
 test_data  <- testing(data_split)
 
 
-
-
-
 ```
 
 
 
+
+In general the Lahman's data set contains fewer data gaps and the variables are more consistently distributed.
+There are some missing values in the data set including the Caught Stealing (CS/TEAM_BASERUN_CS) variable is missing 27.9%; the Batters Hit by Pitch (HBP/TEAM_BATTING_HBP) variable is missing 38.8%; and the Sacrifice Flies (SF) variable is missing 51.6% of the values.
+
+Most of the variables in the data set show some level of skewness, with the following variables having a Kurtosis measure of greater than 3, TEAM_BATTING_H, TEAM_BASERUN_SB, TEAM_BASERUN_CS, TEAM_PITCHING_H, and TEAM_FIELDING_E
+
+The Lahman data set contains several variables with bimodal distributions, including, TEAM_BATTING_HR, TEAM_BATTING_SO, TEAM_BATTING_HR, and TEAM_PITCHING_SO.
 
 
 ```{r}
@@ -209,11 +332,58 @@ print(
 
 
 
-```{r}
 
 
+## Data Preparation
 
-```
+
+The use of the era_cat variable allows us to group the data set into 3 categories that variables that approach normal distribution.
+
+Since segmenting the data set using the era_cat variable creates 3 categories of variables that approach the normal distribution, we will focus our data preparation step on missing values.
+The documentation for MICE package recommends that a 5% threshold should be observed for safely imputing missing values.
+Based on this rule of thumb we will drop the 'TEAM_BASERUN_CS' and the 'TEAM_BATTING_HBP' variables.
+
+The remaining variables with missing data (`TEAM_BATTING_BB`, `TEAM_BATTING_SO` and `TEAM_BASERUN_SB`) will be imputed using the MICE package.
+Several methods can be used but for simplicity we selected m=5 the default method.
+
+
+## Feature Engineering
+
+
+A significant advantage of Lahman's data set over the data set provided in class is that it includes information about the year and the team.
+This data is valuable when considering how baseball has changed over the years.
+The modern era in baseball is often delineated by the turn of the century.
+However, when looking at the past 120 years of baseball history, it is easy to pinpoint rule changes, evolutions in playing strategy, and league structure that have fundamentally impacted the game.
+
+When comparing statistics across time, it is common to use many of the breakdowns below to add context to the analysis:
+
+-   The Dead Ball Era (1901 - 1920)
+-   World War 2 (1941 - 1945)
+-   Segregation Era (1901 - 1947ish)
+-   Post-War Era/Yankees Era (1945 - late 50s/early 60s)
+-   Westward Expansion (1953 - 1961)
+-   Dead Ball 2 (The Sixties, roughly)
+-   Designated Hitter Era (1973 - current, AL only)
+-   Free Agency/Arbitration Era (1975 - current)
+-   Steroid Era (unknown, but late 80s - 2005 seems likely)
+-   Wild Card Era (1994 - current)
+
+Surveying these periods would suggest that a more granular model has the potential to perform better.
+
+Although we could have chosen any number of the time periods above, exploring the statistical outliers highlights that many of these values correspond to the pre-1969 period.
+This delineation has some historical support.
+
+As Jayson Stark of ESPN argues in this article (<https://www.espn.com/mlb/columns/story?columnist=stark_jayson&id=2471349>) In 1969 the MLB underwent several rule changes and changes to the league structure that impacted win totals and team statistics.
+1969 was the first year of division play and the expanded postseason.
+The Pitcher's Mound was lowered five inches.
+The Strike zone shrinks.
+Five-person rotations kicking in.
+The save was invented.
+And more expansion to the unbalanced schedules.
+
+Thus using 1900 as the beginning of the modern era and 1969 as an additional breakpoint, the dataset can be divided into three segments.
+The density profiles for the predictor variables approach a normal distribution when grouped by the three segments we identified.
+To support data exploration, we added a era_cat field to the data set.
 
 
 
@@ -234,37 +404,189 @@ ggplot(sample_n(train_data, size=300, weight_by = era_cat),
 ```
 
 
-# Data Preparation
-
-```{r}
 
 
 
-```
 
 
 
-```{r}
 
 
 
-```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
 # Build Models 
 
 
+The main idea around non-opinionated design is that the system users have the full ability to make their own decisions. It means that, usually, the system provides several ways to accomplish a task, and the user can choose the best one according to the problem and context.
+
+The keyword of non-opinionated solutions is flexibility. By providing multiple manners to accomplish tasks, non-opinionated solutions trust their users in decision-making. Thus, there are no global right ways to do things, but actually one best-fitted way according to the user judgment and resources.
+
+In summary, employing non-opinionated solutions means facing multiple branches on the road, all leading to the same place. So, the better choice is the one that fits better to the available resources.
+
+
+4. Opinionated Design
+
+Generally, we can see the opinionated design as an oracle that indicates the right way to accomplish tasks. So, opinionated solutions provide the resources and clear signs of how is it expected to use them.
+
+However, this characteristic does not mean that opinionated solutions always offer a single manner (the “right” one) to do things. Actually, users typically can adopt other workflows than the advised one. But, doing that, probably the user will face difficulties and potential problems to accomplish tasks.
+
+A significant challenge regarding opinionated design is evaluating if a problem fits the solution. So, if the problem matches with the solution resources and workflows, choosing opinionated software boosts users to solve problems fast and with outstanding quality on the final result.
+
+Otherwise, if the problem doesn’t match the solution, the better choice is to select another opinionated solution (that fits better) or a non-opinionated one.
+
+
+
+
+
+The modeling workflow 
+- recipe
+- model spec
+- data
+- 
+
+
+vFolds
+
+
+The ability to manage multiple m
+
+
+
 ```{r}
 
-wins_rec <- 
-  recipe(W ~ pythPer + era_cat + yearID + teamID + franchID , data = train_data)  %>%
-  update_role(yearID, teamID, franchID, new_role = "ID") %>%
-  step_dummy(all_nominal_predictors())
+
+base_recipe <- 
+   recipe(W ~ pythPer + era_cat + yearID + teamID + franchID + 
+            R + H + X2B + X3B + HR + RA + ER + HA + HRA, data = train_data) %>% 
+   update_role(yearID, teamID, franchID, new_role = "ID") %>%
+   step_dummy(all_nominal_predictors()) %>% 
+   step_zv(all_predictors()) %>% 
+   step_normalize(all_predictors())
 
 
-summary(wins_rec)
+filter_rec <- 
+   base_recipe %>% 
+   step_corr(all_of(statistics), threshold = tune())
 
+
+pca_rec <- 
+   base_recipe %>% 
+   step_pca(all_of(statistics), num_comp = tune()) %>% 
+   step_normalize(all_predictors())
+
+```
+
+
+
+
+```{r}
+
+
+regularized_spec <- 
+   linear_reg(penalty = tune(), mixture = tune()) %>% 
+   set_engine("glmnet")
+
+cart_spec <- 
+   decision_tree(cost_complexity = tune(), min_n = tune()) %>% 
+   set_engine("rpart") %>% 
+   set_mode("regression")
+
+knn_spec <- 
+   nearest_neighbor(neighbors = tune(), weight_func = tune()) %>% 
+   set_engine("kknn") %>% 
+   set_mode("regression")
+
+
+```
+
+
+
+
+```{r}
+
+chi_models <- 
+   workflow_set(
+      preproc = list(simple = base_recipe, filter = filter_rec, 
+                     pca = pca_rec),
+      models = list(glmnet = regularized_spec, cart = cart_spec, 
+                    knn = knn_spec),
+      cross = TRUE
+   )
+chi_models
+
+```
+
+
+
+
+
+# Model Selection
+
+```{r}
+
+chi_models <- 
+   chi_models %>% 
+   anti_join(tibble(wflow_id = c("pca_glmnet", "filter_glmnet")), 
+             by = "wflow_id")
+
+```
+
+
+
+
+```{r}
+
+
+splits <- 
+   vfold_cv(
+      train_data,
+      v = 10,
+      strata = era_cat
+   )
+splits
+
+```
+
+
+
+
+```{r}
+
+chi_models <- 
+   chi_models %>% 
+   # The first argument is a function name from the {{tune}} package
+   # such as `tune_grid()`, `fit_resamples()`, etc.
+   workflow_map("tune_grid", resamples = splits, grid = 10, 
+                metrics = metric_set(mae), verbose = TRUE)
+
+chi_models
+
+```
+
+
+
+
+```{r}
+
+autoplot(chi_models)
+autoplot(chi_models, select_best = TRUE)
 
 ```
 
@@ -273,47 +595,18 @@ summary(wins_rec)
 ```{r}
 
 
-win_lm_mod <- linear_reg() 
-
-
-wins_wflow <- workflow() %>%
-                  add_model(win_lm_mod) %>%
-                  add_recipe(wins_rec)
+rank_results(chi_models, rank_metric = "mae", select_best = TRUE) %>% 
+   select(rank, mean, model, wflow_id, .config)
 
 
 ```
-
-
-
-
-
-
-
-```{r}
-
-wins_fit <- 
-  wins_wflow %>% 
-  fit(data = train_data)
-
-
-wins_fit %>% 
-  extract_fit_parsnip() %>% 
-  tidy()
-
-```
-
-
-
 
 
 
 # Predict
 
-```{r}
 
-predict(wins_fit, test_data)
 
-```
 
 
 
@@ -322,162 +615,105 @@ predict(wins_fit, test_data)
 
 
 
-# Model Set
 
-```{r}
-library(workflowsets)
-```
 
 
-```{r}
 
 
-wins_list <- list(
-  py = W ~ pythPer,
-  hits = W ~ H,
-  era = W ~ pythPer + era_cat
-)
 
-win_lm_mod <- linear_reg() 
-
-win_models <- workflow_set(preproc = wins_list, models = list(lm = win_lm_mod))
-win_models
-
-
-win_models <-
-   win_models %>%
-   mutate(fit = map(info, ~ fit(.x$workflow[[1]], train_data)))
-win_models
-
-
-
-
-```
-
-
-
-
-```{r}
-
-win_models <-
-   win_models %>%
-   mutate(predict = map(fit, ~ predict(.x$workflow[[1]], test_data)))
-win_models
-
-```
-
-
-
-
-```{r}
-
-final_lm_res <- last_fit(lm_wflow, ames_split)
-final_lm_res
-
-
-```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-```{r}
-
-lm_mod <- linear_reg() 
-
-lm_fit <- 
-  lm_mod %>% 
-  fit(W ~ pythPer + era_cat, data = df)
-
-
-```
-
-
-```{r}
-
-tidy(lm_fit) %>% 
-  dwplot(dot_args = list(size = 2, color = "black"),
-         whisker_args = list(color = "black"),
-         vline = geom_vline(xintercept = 0, colour = "grey50", linetype = 2))
-
-```
 
 
 ## Predict New Values
 
 ```{r}
 
-new_points <- expand.grid(pythPer = .5, 
-                          era_cat = c("1900-", "1900-1969", "1969+"))
-new_points
-
-
-
-mean_pred <- predict(lm_fit, new_data = new_points)
-mean_pred
-
-```
-
-
-
-
-
-```{r}
-conf_int_pred <- predict(lm_fit, 
-                         new_data = new_points, 
-                         type = "conf_int")
-conf_int_pred
-
-# bind new columns
-plot_data <- 
-  new_points %>% 
-  bind_cols(mean_pred) %>% 
-  bind_cols(conf_int_pred)
-
-
-
-# and plot:
-ggplot(plot_data, aes(x = era_cat)) + 
-  geom_point(aes(y = .pred)) + 
-  geom_errorbar(aes(ymin = .pred_lower, 
-                    ymax = .pred_upper),
-                width = .2) + 
-  labs(y = "wins")
-
+# new_points <- expand.grid(pythPer = .5, 
+#                           era_cat = c("1900-", "1900-1969", "1969+"))
+# new_points
+# 
+# 
+# 
+# mean_pred <- predict(lm_fit, new_data = new_points)
+# mean_pred
 
 ```
 
 
 
 
-
-```{r}
-
-
-
-```
 
 
 # Model Selection
+
+```{r}
+
+autoplot(chi_models, metric = "mae", id = "simple_glmnet")
+
+
+```
+
+
+
+
+# Prediction
+
+
+```{r}
+
+wins_results <- 
+  chi_models %>% 
+  extract_workflow_set_result("simple_glmnet")
+wins_results
+
+```
+
+
+```{r}
+
+wins_wfl.final <- 
+  chi_models %>% 
+  extract_workflow("simple_glmnet")
+wins_wfl.final
+
+```
+
+
+```{r}
+
+
+wins_workflow_fit <- 
+  wins_wfl.final %>% 
+  #finalize_workflow(tibble(prod_degree = 1)) %>% 
+  fit(data = train_data)
+wins_workflow_fit
+
+
+```
+
+
+
+```{r}
+
+rec <- wins_workflow_fit %>% pull_workflow_prepped_recipe()
+
+df_new_pre_processed <- rec %>%
+  bake(new_data = test_data)
+ 
+
+
+### Make a prediction for cyl
+pred_cyl <- predict(wins_workflow_fit, new_data = test_data, type='numeric')
+df_new_pre_processed <- cbind(df_new_pre_processed, pred_cyl)
+df_new_pre_processed
+
+
+
+
+
+
+
+
+```
 
 
 
@@ -485,8 +721,30 @@ ggplot(plot_data, aes(x = era_cat)) +
 # Conclusion
 
 
+Conclusion
+ 
+It has been a long argument, so perhaps a summary of the main points will help convince you that tidymodels should go back to the drawing board.
+ 
+1. tidymodels appears to be based on the idea that modelling should be made easier, while a better approach would have been to base it on a comprehensive design that captures how modelling ought to be performed within the tidyverse. 
+
+2. tidymodels duplicates some features already available in the tidyverse.
+
+3. tidymodels uses separate functions to define the stages in the analysis and only performs the calculations once the full method is specified. This has two consequences,
+it discourages checking of intermediate steps and so makes errors more likely.
+it strays away from the basic structure of R in which a function is used to define an action that is to be performed at some later stage and the arguments to that function define the specific choices.
+
+4. tidymodels makes it easier to specify the model that you want to use by hiding the details and terminology of the package that will perform the calculations. In doing so,
+tidymodels makes decisions for the user in the form of defaults, so that the user will find it harder to keep track of the details of their analysis.
+the user is encouraged to use methods that they do not completely understand.
+5. tidymodels offers a complete one-stop solution to modelling. Consequently,
+it is difficult for the user to adapt the tidymodels functions for use outside of tidymodels.
+it is difficult for users to add to tidymodels.
+the design is centrally controlled, which will limit the speed of its development and will not make full use of the skills of the R Community.
+I believe that if the tidymodels team were to start afresh, they would come up with a design that would be very similar to that used in the modelr package. tidymodels needs to provide a strong design and a few basic tools. If the design and tools are any good, the community of R users will adopt them and develop new packages for data modelling.
 
 
+
+https://staffblogs.le.ac.uk/teachingr/2020/10/05/on-not-using-tidymodels/
 
 
 
