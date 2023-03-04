@@ -277,7 +277,7 @@ The recipe, model specification, pre-processing, and post-processing definitions
 
 ```{r}
 
-team_wfl <- 
+team_wfl_set <- 
    workflow_set(
       preproc = list(simple = base_recipe, filter = filter_rec, 
                      pca = pca_rec),
@@ -285,7 +285,7 @@ team_wfl <-
                     knn = knn_spec),
       cross = TRUE
    )
-team_wfl
+team_wfl_set
 
 ```
 
@@ -297,8 +297,8 @@ team_wfl
 
 ```{r}
 
-chi_models <- 
-   chi_models %>% 
+team_wfl_set <- 
+   team_wfl_set %>% 
    anti_join(tibble(wflow_id = c("pca_glmnet", "filter_glmnet")), 
              by = "wflow_id")
 
@@ -325,14 +325,12 @@ splits
 
 ```{r}
 
-chi_models <- 
-   chi_models %>% 
-   # The first argument is a function name from the {{tune}} package
-   # such as `tune_grid()`, `fit_resamples()`, etc.
+team_wfl_set <- 
+   team_wfl_set %>% 
    workflow_map("tune_grid", resamples = splits, grid = 10, 
                 metrics = metric_set(mae), verbose = TRUE)
 
-chi_models
+team_wfl_set
 
 ```
 
@@ -341,8 +339,8 @@ chi_models
 
 ```{r}
 
-autoplot(chi_models)
-autoplot(chi_models, select_best = TRUE)
+autoplot(team_wfl_set)
+autoplot(team_wfl_set, select_best = TRUE)
 
 ```
 
@@ -351,7 +349,7 @@ autoplot(chi_models, select_best = TRUE)
 ```{r}
 
 
-rank_results(chi_models, rank_metric = "mae", select_best = TRUE) %>% 
+rank_results(team_wfl_set, rank_metric = "mae", select_best = TRUE) %>% 
    select(rank, mean, model, wflow_id, .config)
 
 
@@ -403,7 +401,7 @@ rank_results(chi_models, rank_metric = "mae", select_best = TRUE) %>%
 
 ```{r}
 
-autoplot(chi_models, metric = "mae", id = "simple_glmnet")
+autoplot(team_wfl_set, metric = "mae", id = "simple_glmnet")
 
 
 ```
@@ -417,11 +415,34 @@ autoplot(chi_models, metric = "mae", id = "simple_glmnet")
 ```{r}
 
 
+tmp <- extract_workflow(team_wfl_set,id = 'filter_knn')
+t0 <- fit(tmp, data=train_data)
+
+t1 <- t0 %>% predict(test_data)
 
 
-wins_results <- 
-  chi_models %>% 
+
+
+
+tmp <- team_wfl_set %>% extract_spec_parsnip('simple_glmnet')
+tmp.fit(train_data)
+
+
+
+
+
+
+
+team_wfl_set %>% modeltime_fit_workflowset(train_data)
+
+
+team_wfl_final <- 
+  team_wfl_set %>% 
   extract_recipe("simple_glmnet")
+
+
+#team_rec_final.fit()
+
 
 
 
@@ -438,10 +459,10 @@ wins_results <-
 
 ```{r}
 
-wins_wfl.final <- 
-  chi_models %>% 
-  extract_workflow("simple_glmnet")
-wins_wfl.final
+# wins_wfl.final <- 
+#   chi_models %>% 
+#   extract_workflow("simple_glmnet")
+# wins_wfl.final
 
 ```
 
@@ -449,11 +470,11 @@ wins_wfl.final
 ```{r}
 
 
-wins_workflow_fit <- 
-  wins_wfl.final %>% 
-  #finalize_workflow(tibble(prod_degree = 1)) %>% 
-  fit(data = train_data)
-wins_workflow_fit
+# wins_workflow_fit <- 
+#   wins_wfl.final %>% 
+#   #finalize_workflow(tibble(prod_degree = 1)) %>% 
+#   fit(data = train_data)
+# wins_workflow_fit
 
 
 ```
@@ -519,5 +540,84 @@ https://staffblogs.le.ac.uk/teachingr/2020/10/05/on-not-using-tidymodels/
 
 Overlays an workflow and methodology for solving problem - Since the frameworks are built by experience individuals in a particular field it also includes their best practices around how to approach problems. 
 The tools help guid individuals into the right directions
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+
+
+base_recipe <- 
+   recipe(W ~ pythPer + era_cat + yearID + teamID + franchID + 
+            R + H + X2B + X3B + HR + RA + ER + HA + HRA, data = train_data) %>% 
+   update_role(yearID, teamID, franchID, new_role = "ID") %>%
+   step_dummy(all_nominal_predictors()) %>% 
+   step_zv(all_predictors()) %>% 
+   step_normalize(all_predictors())
+
+
+lm_model <- 
+  linear_reg() %>% 
+  set_engine("lm") %>% 
+  set_mode("regression")
+
+
+lm_wflow <- 
+  workflow() %>% 
+  add_recipe(base_recipe) %>%
+  add_model(lm_model) 
+
+  
+wins_fit <- 
+  lm_wflow %>% 
+  fit(data = train_data)
+
+
+# Make predictions on test set
+pred <- wins_fit %>% predict(new_data = test_data)
+
+
+# Predict rentals for the test set and bind it to the test_set
+results <- test_data %>% 
+  bind_cols(wins_fit %>% 
+    predict(new_data = test_data) %>% 
+      rename(predictions = .pred))
+
+
+# Compare predictions
+results %>% 
+  select(c(W, predictions)) %>% 
+  slice_head(n = 10)
+
+
+
+```
+
+
+
+
+
+
+```{r}
+
+
+
+
+```
+
+
+
+
+
+
 
 
