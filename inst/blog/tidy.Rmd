@@ -74,7 +74,7 @@ Uniform data that conforms to tidy data specifications is more consistent and ea
 
 ```{r}
 
-#rm(list=ls())
+rm(list=ls())
 
 cfg <- list(
               fileName = './inst/data/Teams.csv',
@@ -138,7 +138,7 @@ st_css()
 
 # read data
 df <- read.csv('./inst/data/Teams.csv')
-df <- sample_n(df, size=400)
+df <- sample_n(df, size=200)
 statistics <- c('R', 'H', 'X2B', 'X3B', 'HR', 
                     'RA', 'ER', 'HA', 'HRA')
 
@@ -171,6 +171,14 @@ test_data  <- testing(data_split)
 
 
 ```{r}
+train_data %>% 
+  skimr::skim()
+
+```
+
+
+
+```{r}
 
 print(
   dfSummary(train_data %>% select(-c('teamID','franchID','name')), 
@@ -189,7 +197,7 @@ print(
 ```{r}
 
 
-ggplot(sample_n(train_data, size=300, weight_by = era_cat),
+ggplot(sample_n(train_data, size=100, weight_by = era_cat),
        aes(x = wPer, 
            y = pythPer, 
            group = era_cat, 
@@ -249,20 +257,40 @@ A unified interface to the available model is provided by the parsnip package. T
 
 ```{r}
 
+# 
+# regularized_spec <- 
+#    linear_reg(mode = 'regression', penalty = tune(), mixture = tune()) %>% 
+#    set_engine("glmnet")
+# 
+# cart_spec <- 
+#    decision_tree(cost_complexity = tune(), min_n = tune()) %>% 
+#    set_engine("rpart") %>% 
+#    set_mode("regression")
+# 
+# knn_spec <- 
+#    nearest_neighbor(neighbors = tune(), weight_func = tune()) %>% 
+#    set_engine("kknn") %>% 
+#    set_mode("regression")
 
-regularized_spec <- 
-   linear_reg(penalty = tune(), mixture = tune()) %>% 
-   set_engine("glmnet")
+lm_model <- 
+  linear_reg() %>% 
+  set_engine("lm") %>% 
+  set_mode("regression")
 
-cart_spec <- 
-   decision_tree(cost_complexity = tune(), min_n = tune()) %>% 
-   set_engine("rpart") %>% 
-   set_mode("regression")
+lms_model <- 
+  linear_reg() %>% 
+  set_engine("stan") %>% 
+  set_mode("regression")
 
-knn_spec <- 
-   nearest_neighbor(neighbors = tune(), weight_func = tune()) %>% 
-   set_engine("kknn") %>% 
-   set_mode("regression")
+rf_model <- rand_forest(mtry = 10, trees = 2000) %>%
+  set_engine("ranger", importance = "impurity") %>%
+  set_mode("regression")
+
+# pr_model <- poisson_reg(
+#   mode = "regression",
+#   engine = "poissonreg")
+
+
 
 
 ```
@@ -279,10 +307,12 @@ The recipe, model specification, pre-processing, and post-processing definitions
 
 team_wfl_set <- 
    workflow_set(
-      preproc = list(simple = base_recipe, filter = filter_rec, 
+      preproc = list(simple = base_recipe, 
+                     filter = filter_rec, 
                      pca = pca_rec),
-      models = list(glmnet = regularized_spec, cart = cart_spec, 
-                    knn = knn_spec),
+      models = list(lm = lm_model, 
+                    stan = lms_model,
+                    rf = rf_model),
       cross = TRUE
    )
 team_wfl_set
@@ -297,10 +327,10 @@ team_wfl_set
 
 ```{r}
 
-team_wfl_set <- 
-   team_wfl_set %>% 
-   anti_join(tibble(wflow_id = c("pca_glmnet", "filter_glmnet")), 
-             by = "wflow_id")
+# team_wfl_set <- 
+#    team_wfl_set %>% 
+#    anti_join(tibble(wflow_id = c("pca_glmnet", "filter_glmnet")), 
+#              by = "wflow_id")
 
 ```
 
@@ -401,7 +431,7 @@ rank_results(team_wfl_set, rank_metric = "mae", select_best = TRUE) %>%
 
 ```{r}
 
-autoplot(team_wfl_set, metric = "mae", id = "simple_glmnet")
+autoplot(team_wfl_set, metric = "mae", id = "filter_rf")
 
 
 ```
@@ -415,30 +445,65 @@ autoplot(team_wfl_set, metric = "mae", id = "simple_glmnet")
 ```{r}
 
 
-tmp <- extract_workflow(team_wfl_set,id = 'filter_knn')
-t0 <- fit(tmp, data=train_data)
-
-t1 <- t0 %>% predict(test_data)
+tmp_wfl <- extract_workflow(team_wfl_set,id = 'simple_rf')
 
 
 
-
-
-tmp <- team_wfl_set %>% extract_spec_parsnip('simple_glmnet')
-tmp.fit(train_data)
-
-
-
+tmp_wfl.fit <- 
+  tmp_wfl %>% 
+  #finalize_workflow() %>% 
+  fit(data = train_data)
 
 
 
+tmp_rec <- 
+   team_wfl_set %>% 
+   extract_workflow_set_result("simple_rf")
+tmp_rec
 
-team_wfl_set %>% modeltime_fit_workflowset(train_data)
 
 
-team_wfl_final <- 
-  team_wfl_set %>% 
-  extract_recipe("simple_glmnet")
+wins_fit <- 
+  tmp_wfl %>% 
+  fit(data = train_data)
+
+
+# Make predictions on test set
+pred <- tmp_wfl.fit  %>% predict(new_data = test_data)
+
+
+
+results <- test_data %>% 
+  bind_cols(tmp_wfl.fit %>% 
+    predict(new_data = test_data) %>% 
+      rename(predictions = .pred))
+
+
+
+
+# t0 <- fit(tmp, data=train_data)
+# 
+# t1 <- t0 %>% predict(test_data)
+# 
+# 
+# 
+# 
+# 
+# tmp <- team_wfl_set %>% extract_spec_parsnip('simple_glmnet')
+# tmp.fit(train_data)
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# team_wfl_set %>% modeltime_fit_workflowset(train_data)
+# 
+# 
+# team_wfl_final <- 
+#   team_wfl_set %>% 
+#   extract_recipe("simple_glmnet")
 
 
 #team_rec_final.fit()
@@ -608,6 +673,9 @@ results %>%
 
 
 ```{r}
+library(DALEXtra)
+
+explain_tidymodels(wins_fit, data=train_data, y=train_data$W)
 
 
 
@@ -618,6 +686,74 @@ results %>%
 
 
 
+```{r}
+
+library(rstanarm)
+library(ranger)
+library(poissonreg)
+
+base_recipe <- 
+   recipe(W ~ pythPer + era_cat + yearID + teamID + franchID + 
+            R + H + X2B + X3B + HR + RA + ER + HA + HRA, data = train_data) %>% 
+   update_role(yearID, teamID, franchID, new_role = "ID") %>%
+   step_dummy(all_nominal_predictors()) %>% 
+   step_zv(all_predictors()) %>% 
+   step_normalize(all_predictors())
+
+
+lm_model <- 
+  linear_reg() %>% 
+  set_engine("lm") %>% 
+  set_mode("regression")
+
+lms_model <- 
+  linear_reg() %>% 
+  set_engine("stan") %>% 
+  set_mode("regression")
+
+rf_model <- rand_forest(mtry = 10, trees = 2000) %>%
+  set_engine("ranger", importance = "impurity") %>%
+  set_mode("regression")
+
+pr_model <- poisson_reg(
+  mode = "regression",
+  #penalty = NULL,
+  #mixture = NULL,
+  engine = "glm"
+)
+
+
+
+lm_wflow <- 
+  workflow() %>% 
+  add_recipe(base_recipe) %>%
+  add_model(lms_model) 
+
+  
+wins_fit <- 
+  lm_wflow %>% 
+  fit(data = train_data)
+
+
+# Make predictions on test set
+pred <- wins_fit %>% predict(new_data = test_data)
+
+
+# Predict rentals for the test set and bind it to the test_set
+results <- test_data %>% 
+  bind_cols(wins_fit %>% 
+    predict(new_data = test_data) %>% 
+      rename(predictions = .pred))
+
+
+# Compare predictions
+results %>% 
+  select(c(W, predictions)) %>% 
+  slice_head(n = 10)
+
+
+
+```
 
 
 
